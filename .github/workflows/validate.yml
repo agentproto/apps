@@ -1,0 +1,56 @@
+name: Validate entries
+
+# Every PR: policy (scripts/check-pr.mjs, taken from the BASE branch so a PR
+# cannot rewrite its own rules), then bundle integrity of each added or
+# changed entry (`agentproto catalog verify`: download, size, sha256, unpack,
+# manifest validation, appId/version match, no ui.build), then a full
+# catalog build so the merged set is known to be valid.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Policy
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          if git cat-file -e "$BASE_REF:scripts/check-pr.mjs" 2>/dev/null; then
+            git show "$BASE_REF:scripts/check-pr.mjs" > "$RUNNER_TEMP/check-pr.mjs"
+          else
+            echo "::warning::no check-pr.mjs on $BASE_REF yet, using the PR copy (bootstrap PR)"
+            cp scripts/check-pr.mjs "$RUNNER_TEMP/check-pr.mjs"
+          fi
+          node "$RUNNER_TEMP/check-pr.mjs" --author "$AUTHOR" --base "$BASE_REF"
+
+      - name: Install agentproto CLI
+        run: npm install -g "@agentproto/cli@${{ vars.AGENTPROTO_CLI_VERSION || 'latest' }}"
+
+      - name: Verify changed entries
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+        run: |
+          mapfile -t changed < <(git diff --name-only --diff-filter=AM "$BASE_REF...HEAD" -- entries/ | grep '\.json$' || true)
+          if [ "${#changed[@]}" -eq 0 ]; then echo "no entry added or changed"; exit 0; fi
+          agentproto catalog verify "${changed[@]}"
+
+      - name: Build the catalog
+        run: |
+          agentproto catalog build entries --out "$RUNNER_TEMP/apps.json"
+          echo "catalog builds: $(node -p "require('$RUNNER_TEMP/apps.json').entries.length") entries"
