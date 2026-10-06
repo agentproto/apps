@@ -1,0 +1,52 @@
+name: Publish catalog
+
+# main: regenerate catalog/v1/apps.json from entries/ and commit it when it
+# changed. https://agentproto.sh/catalog/v1/apps.json relays this file
+# (raw.githubusercontent.com, cached 5 min), so a merged entry is live within
+# minutes, no site deploy needed.
+
+on:
+  push:
+    branches: [main]
+    paths: ["entries/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-catalog
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install agentproto CLI
+        run: npm install -g "@agentproto/cli@${{ vars.AGENTPROTO_CLI_VERSION || 'latest' }}"
+
+      - name: Build
+        id: build
+        run: |
+          if agentproto catalog build entries --out catalog/v1/apps.json --check; then
+            echo "catalog up to date"; echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            agentproto catalog build entries --out catalog/v1/apps.json
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit
+        if: steps.build.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog/v1/apps.json
+          git commit -m "chore(catalog): regenerate catalog/v1/apps.json"
+          git push
