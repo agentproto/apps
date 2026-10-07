@@ -1,5 +1,23 @@
 {
   "schema": "app-catalog/v1",
-  "generatedAt": "1970-01-01T00:00:00.000Z",
-  "entries": []
+  "generatedAt": "2026-10-07T14:38:11.542Z",
+  "entries": [
+    {
+      "appId": "@agentik/session-chat",
+      "name": "Session Chat",
+      "description": "View and continue any agentproto daemon session's conversation in the Agentik chat UI (assistant-ui based). Pick a session from the live/recent list or deep-link with ?session=<id>; the page replays the session's full transcript, then follows it live over SSE, and lets you send follow-up prompts into the same session. Built on @agstudio/react-agentproto (SSE transcript projection, permission approval, thread list) and @agstudio/chat-starter's assistant-ui shell, reused almost as-is.",
+      "source": {
+        "kind": "agentapp",
+        "url": "https://github.com/agentproto/apps/releases/download/session-chat%400.1.0/session-chat-0.1.0.agentapp",
+        "sha256": "12216f65fa3cff9bfb9fcd49c46c9166eb68a790d278d466e07e0a95df5f4eef",
+        "version": "0.1.0",
+        "size": 518621
+      },
+      "version": "0.1.0",
+      "tier": "bundle",
+      "license": {
+        "kind": "free"
+      }
+    }
+  ]
 }
