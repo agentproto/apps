@@ -7,6 +7,8 @@ at a compiled `.agentapp` bundle hosted somewhere public. The app's source code
 lives wherever its publisher keeps it.
 
 - `entries/<appId>.json`: one entry per app (e.g. `entries/@acme/notes.json`).
+- `media/<appId>/<version>/`: icon and screenshots of an app's store page
+  (e.g. `media/@acme/notes/1.2.0/editor.png`).
 - `catalog/v1/apps.json`: generated from `entries/` on every merge to `main`.
   Never edit it by hand.
 - Releases of this repo host the bundles of first-party apps (tag
@@ -58,6 +60,42 @@ An entry is an `app-catalog/v1` entry (`AppCatalogEntry` in
   not published in `catalog/v1/apps.json`.
 - `@agentproto/*` app ids are reserved to the maintainers.
 
+## Store page (listing)
+
+Each app has a page at `https://agentproto.sh/apps/<slug>`. Optional entry
+fields fill it in: `tagline`, `longDescription` (markdown, raw HTML is not
+rendered), `screenshots` (`{url, alt, width?, height?}`), `icon`,
+`categories`, `publisher`, `homepage`, `repository`.
+
+Declare them in your app's APP.md `store:` block and
+`agentproto app pack --release --entry` writes them into the entry:
+
+```yaml
+store:
+  tagline: Notes with your agents.          # 1 to 120 characters
+  categories: [productivity, notes]          # at most 5, [a-z0-9-]
+  publisher: Acme
+  homepage: https://acme.dev/notes
+  repository: https://github.com/acme/notes
+  icon: store/icon.svg                       # png/jpeg/webp/svg, 256 KB max
+  listing: store/LISTING.md                  # long description, markdown
+  screenshots:                               # at most 8, png/jpeg/webp, 1 MB max
+    - path: store/screenshots/editor.png
+      alt: The note editor next to an agent session    # required
+```
+
+Local media are copied to `media/<appId>/<version>/` next to the entry
+and referenced from this repo
+(`https://raw.githubusercontent.com/agentproto/apps/main/media/<appId>/<version>/<file>`):
+add that folder to your PR, next to `entries/<appId>.json`. To host
+them yourself, pack with `--media-base-url https://your.host/path` and
+upload the folder there instead. All URLs must be https.
+
+CI checks the media the same way as the bundle: `check-pr.mjs` (paths,
+owners, 1 MB cap) and `agentproto catalog verify` (format, size, alt text,
+limits), reading the PR's own media from the checkout. Media of a version
+stay in place once merged; a new version gets its own folder.
+
 ## Publish your app
 
 1. Build a release bundle and its entry:
@@ -75,11 +113,16 @@ An entry is an `app-catalog/v1` entry (`AppCatalogEntry` in
 3. Check it like CI will:
 
    ```bash
-   agentproto catalog verify notes-1.2.0.entry.json
+   agentproto catalog verify notes-1.2.0.entry.json \
+     --local-media https://raw.githubusercontent.com/agentproto/apps/main/=.
    ```
 
+   (`--local-media` reads listing media from the folder `pack` wrote, before
+   they are on `main`.)
+
 4. Copy the entry to `entries/<appId>.json`, add `"owners": ["<your-login>"]`,
-   and open a pull request.
+   add the `media/` folder if your app has a store listing, and open a pull
+   request.
 
 CI then checks the policy (paths, owners, reserved ids), downloads your bundle,
 and verifies its size, digest and manifest (`agentproto catalog verify`). A

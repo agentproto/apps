@@ -9,7 +9,8 @@
 //   Changed files are `git diff --name-status <base>...HEAD`.
 //
 // Rules:
-//   1. Non-maintainers (MAINTAINERS, base branch) may only touch entries/**.
+//   1. Non-maintainers (MAINTAINERS, base branch) may only touch entries/**
+//      and media/**.
 //      catalog/v1/apps.json is generated on main: only a maintainer may
 //      touch it in a PR (bootstrap, repair).
 //   2. An entry lives at entries/<appId>.json (e.g. entries/@acme/notes.json)
@@ -19,9 +20,14 @@
 //      published catalog) protects an app id: adding an entry requires the
 //      author in its `owners`; changing or deleting one requires the author
 //      in the BASE version's `owners`. Maintainers may do both.
+//   5. Store listing media live in media/<appId>/<version>/<file>
+//      (png/jpg/jpeg/webp/svg, 1 MB max): changing them needs the same
+//      ownership as entries/<appId>.json (its base owners, or the owners of
+//      the entry this PR adds). Format/size/alt are re-checked by
+//      `agentproto catalog verify --local-media`.
 
 import { execFileSync } from "node:child_process"
-import { readFileSync, existsSync } from "node:fs"
+import { readFileSync, existsSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { parseArgs } from "node:util"
 
@@ -40,7 +46,8 @@ if (!author || !base) {
   process.exit(2)
 }
 
-const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" })
+const git = (...args) =>
+  execFileSync("git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
 const showBase = (path) => {
   try {
     return git("show", `${base}:${path}`)
@@ -77,13 +84,47 @@ const changes = git("diff", "--name-status", "--no-renames", `${base}...HEAD`)
 const owners = (entry) =>
   Array.isArray(entry?.owners) ? entry.owners.map((o) => String(o).toLowerCase()) : []
 
+const MEDIA_RE = /^media\/(@[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9._-]*)\/[0-9A-Za-z.+-]+\/[A-Za-z0-9._-]+\.(png|jpe?g|webp|svg)$/
+const MEDIA_MAX_BYTES = 1_000_000
+
+/** Owners allowed to touch an app's media: base entry owners, else the
+ *  owners of the entry this PR adds. */
+function mediaOwners(appId) {
+  const entryPath = `entries/${appId}.json`
+  const base = showBase(entryPath)
+  if (base !== undefined) return owners(parseJson(base, `${entryPath} (base)`))
+  const file = join(root, entryPath)
+  return existsSync(file) ? owners(parseJson(readFileSync(file, "utf8"), entryPath)) : []
+}
+
 for (const { status, path } of changes) {
+  if (path.startsWith("media/")) {
+    const mm = MEDIA_RE.exec(path)
+    if (!mm) {
+      errors.push(`${path}: media must be media/@<scope>/<name>/<version>/<file>.(png|jpg|jpeg|webp|svg)`)
+      continue
+    }
+    const appId = mm[1]
+    if (appId.startsWith("@agentproto/") && !isMaintainer) {
+      errors.push(`${path}: @agentproto/* app ids are reserved to maintainers`)
+    }
+    if (!isMaintainer && !mediaOwners(appId).includes(author)) {
+      errors.push(`${path}: ${author} is not in the owners of ${appId}`)
+    }
+    if (status !== "D") {
+      const file = join(root, path)
+      if (existsSync(file) && statSync(file).size > MEDIA_MAX_BYTES) {
+        errors.push(`${path}: ${statSync(file).size} bytes, over the ${MEDIA_MAX_BYTES} byte cap`)
+      }
+    }
+    continue
+  }
   if (path === "catalog/v1/apps.json") {
     if (!isMaintainer) errors.push(`${path}: generated on main by the catalog workflow, do not edit it in a PR`)
     continue
   }
   if (!path.startsWith("entries/")) {
-    if (!isMaintainer) errors.push(`${path}: only maintainers may change files outside entries/`)
+    if (!isMaintainer) errors.push(`${path}: only maintainers may change files outside entries/ and media/`)
     continue
   }
   if (path === "entries/.gitkeep") continue

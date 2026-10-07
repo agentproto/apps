@@ -46,9 +46,23 @@ jobs:
         env:
           BASE_REF: origin/${{ github.base_ref }}
         run: |
-          mapfile -t changed < <(git diff --name-only --diff-filter=AM "$BASE_REF...HEAD" -- entries/ | grep '\.json$' || true)
+          # Entries added/changed, plus the entry of any app whose listing
+          # media (media/<appId>/<version>/...) changed.
+          mapfile -t changed < <(
+            {
+              git diff --name-only --diff-filter=AM "$BASE_REF...HEAD" -- entries/ | grep '\.json$' || true
+              git diff --name-only "$BASE_REF...HEAD" -- media/ \
+                | sed -nE 's#^media/(@[^/]+/[^/]+)/.*#entries/\1.json#p' || true
+            } | sort -u | while read -r f; do [ -f "$f" ] && echo "$f"; done
+          )
           if [ "${#changed[@]}" -eq 0 ]; then echo "no entry added or changed"; exit 0; fi
-          agentproto catalog verify "${changed[@]}"
+          # Listing media this PR adds are not on main yet: read them from the
+          # checkout (CLI with store listing support only).
+          media=()
+          if agentproto catalog verify --help 2>&1 | grep -q -- "--local-media"; then
+            media=(--local-media "https://raw.githubusercontent.com/agentproto/apps/main/=$PWD")
+          fi
+          agentproto catalog verify "${changed[@]}" "${media[@]}"
 
       - name: Build the catalog
         run: |
