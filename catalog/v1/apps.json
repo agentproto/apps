@@ -1,6 +1,6 @@
 {
   "schema": "app-catalog/v1",
-  "generatedAt": "2026-11-04T13:01:58.946Z",
+  "generatedAt": "2026-11-04T16:39:05.774Z",
   "entries": [
     {
       "appId": "@agentik/session-chat",
@@ -73,13 +73,13 @@
       "description": "Browse, install and update agentproto apps. Projects the daemon's catalog and installed app registry into one storefront (featured shelf, category filters, detail pages, install drawer, update badges) and dispatches the existing app_catalog / app_list / app_updates / app_install / app_resync / app_uninstall / app_status / app_run / app_ui_app verbs. Installs keep the existing preview-then-confirm step (source URL, pinned digest or commit, and whether a build command runs) before any write.",
       "source": {
         "kind": "agentapp",
-        "url": "https://github.com/agentproto/apps/releases/download/app-store%400.3.0/app-store-0.3.0.agentapp",
-        "sha256": "2063e8bd0fea864bf0e4131a3aa7e7d0ac8f07df0cceeda839d4b594dcb01902",
-        "version": "0.3.0",
-        "size": 46050
+        "url": "https://github.com/agentproto/apps/releases/download/app-store%400.3.1/app-store-0.3.1.agentapp",
+        "sha256": "c28cc9e2980758a98966b6a42a1f28effcc12f93669c1cd42050239df068518a",
+        "version": "0.3.1",
+        "size": 46051
       },
-      "icon": "https://raw.githubusercontent.com/agentproto/apps/main/media/@agentproto/app-store/0.3.0/icon.svg",
-      "version": "0.3.0",
+      "icon": "https://raw.githubusercontent.com/agentproto/apps/main/media/@agentproto/app-store/0.3.1/icon.svg",
+      "version": "0.3.1",
       "tier": "bundle",
       "publisher": "agentproto",
       "publisherUrl": "https://agentproto.sh",
